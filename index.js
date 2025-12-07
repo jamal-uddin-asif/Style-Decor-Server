@@ -3,7 +3,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 require("dotenv").config();
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = process.env.MONGODB_URL;
 
 app.use(cors());
@@ -31,7 +31,7 @@ async function run() {
     app.post("/users", async (req, res) => {
       const user = req.body;
       console.log(user);
-      (user.role = "user"), (user.createdAt = new Date().toDateString());
+      (user.role = "User"), (user.createdAt = new Date().toDateString());
 
       const result = await userCollection.insertOne(user);
       res.send(result);
@@ -46,6 +46,22 @@ async function run() {
       const result = await userCollection.find().toArray()
       res.send(result)
     });
+
+    app.patch('/users/:id', async(req, res)=>{
+      const id = req.params.id;
+      const role = req.body.role;
+
+      const query = {_id: new ObjectId(id)}
+
+      const updateDoc = {
+        $set:{
+          role: role
+        }
+      }
+      const result = await userCollection.updateOne(query, updateDoc)
+      res.send(result)
+
+    })
 
     // services related APIs 
     app.post('/services', async(req, res)=>{
