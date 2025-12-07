@@ -25,6 +25,7 @@ async function run() {
   try {
     const db = client.db("StyleDecor");
     const userCollection = db.collection("Users");
+    const servicesCollection = db.collection("Services");
 
     // user related api
     app.post("/users", async (req, res) => {
@@ -45,6 +46,18 @@ async function run() {
       const result = await userCollection.find().toArray()
       res.send(result)
     });
+
+    // services related APIs 
+    app.post('/services', async(req, res)=>{
+      const service = req.body;
+      const result = await servicesCollection.insertOne(service)
+      res.send(result)
+
+    })
+
+
+
+    
 
     await client.db("admin").command({ ping: 1 });
     console.log(
