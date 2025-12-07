@@ -36,7 +36,15 @@ async function run() {
       res.send(result);
     });
 
-  
+    app.get("/users", async (req, res) => {
+      const { email } = req.query;
+      const query = {};
+      if (email) {
+        query.email = email;
+      }
+      const result = await userCollection.find().toArray()
+      res.send(result)
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
