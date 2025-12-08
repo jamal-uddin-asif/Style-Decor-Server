@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("Nexa Decor running fast!");
+  res.send("Style Decor running fast!");
 });
 
 const client = new MongoClient(uri, {
@@ -72,8 +72,24 @@ async function run() {
     })
 
     app.get('/services', async(req, res)=>{
-      const cursor = servicesCollection.find()
+      const {search, category} = req.query
+      const query = {}
+      if(search){
+        query.serviceName = {$regex: search,$options: "i"}
+      }
+      if(category){
+        query.category = category;
+      }
+      console.log(category)
+      const cursor = servicesCollection.find(query)
       const result = await cursor.toArray()
+      res.send(result)
+    })
+
+    app.get('/services/:id', async(req, res)=>{
+      const id = req.params.id
+      const query = {_id: new ObjectId(id)}
+      const result = await servicesCollection.findOne(query)
       res.send(result)
     })
 
@@ -90,5 +106,5 @@ async function run() {
 run().catch(console.dir);
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`Style Decor app listening on port ${port}`);
 });
