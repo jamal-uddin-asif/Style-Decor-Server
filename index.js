@@ -135,7 +135,7 @@ async function run() {
       res.send(result);
     });
 
-    // Booking related APIs here
+    //***********  Booking related APIs here *****************
     app.post("/bookings", async (req, res) => {
       const bookingInfo = req.body;
       bookingInfo.trackingId = generateTrackingId();
@@ -152,6 +152,35 @@ async function run() {
       const result = await bookingCollection.find(query).toArray();
       res.send(result);
     });
+
+    app.get('/bookings/decorator-assigned', async(req, res)=>{
+      const {email} = req.query;
+      const query = {}
+      if(email){
+        query.decoratorEmail= email;
+      }
+      const result = await bookingCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    app.patch('/bookings/:id', async(req, res)=>{
+      const decorator = req.body;
+      const bookingId = req.params.id;
+      const query = {_id: new ObjectId(bookingId)}
+      const updateDoc = {
+        $set:{
+          decoratorName: decorator.decoratorName,
+          decoratorEmail: decorator.decoratorEmail,
+          decoratorPhoto: decorator.decoratorPhoto,
+          decoratorId: decorator.decoratorId,
+          serviceStatus: 'Assigned'
+        }
+      }
+
+      const result = await bookingCollection.updateOne(query, updateDoc)
+      res.send(result)
+
+    })
 
     app.delete("/booking/:id", async (req, res) => {
       const { id } = req.params;
