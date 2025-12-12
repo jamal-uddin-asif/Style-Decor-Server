@@ -10,6 +10,13 @@ const stripe = require("stripe")(process.env.STRIPE_SECRETE_KEY);
 app.use(cors());
 app.use(express.json());
 
+const admin = require("firebase-admin");
+const serviceAccount = require("./firebase-adminsdk.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
 app.get("/", (req, res) => {
   res.send("Style Decor running fast!");
 });
@@ -37,6 +44,29 @@ function generateTrackingId() {
   const random = Math.floor(100000 + Math.random() * 900000); // 6 digits
   // Step 3: Combine
   return `${prefix}-${timestamp}-${random}`;
+}
+
+const verifyFirebaseToken =async (req, res, next) =>{
+  const authorization = req.headers.authorization
+ if(!authorization){
+  res.status(401).send({message: 'Unauthorized access'})
+  return
+ }
+ const token = authorization.split(' ')[1]
+ if(!token) {
+  res.status(401).send({message: 'Unauthorized access'})
+  return
+ }
+
+ try{
+    const decoded = await admin.auth().verifyIdToken(token)
+    req.decoded_email = decoded.email;
+    next()
+ }catch(err){
+    res.status(401).send({message: 'Unauthorized access'})
+    return
+ }
+
 }
 
 async function run() {
@@ -143,11 +173,16 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/bookings", async (req, res) => {
+    app.get("/bookings",verifyFirebaseToken, async (req, res) => {
+      console.log('api theke',req.decoded_email)
       const { email } = req.query;
       const query = {};
       if (email) {
         query.customerEmail = email;
+      }
+      if(email !== req.decoded_email){
+        res.status(403).send({message: 'Forbidden access'})
+        return
       }
       const result = await bookingCollection.find(query).toArray();
       res.send(result);
@@ -176,9 +211,24 @@ async function run() {
           serviceStatus: 'Assigned'
         }
       }
-
       const result = await bookingCollection.updateOne(query, updateDoc)
       res.send(result)
+    })
+
+    app.patch('/bookings/:id/Update-service-status', async(req, res)=>{
+      const id = req.params.id;
+      const {status} = req.body;
+      const query = {_id: new ObjectId(id)}
+
+      const updateDoc = {
+        $set:{
+          serviceStatus: status,
+        }
+      }
+
+      const result = bookingCollection.updateOne(query, updateDoc)
+      res.send(result)
+
 
     })
 
