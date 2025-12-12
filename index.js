@@ -188,11 +188,21 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/bookings/decorator-assigned', async(req, res)=>{
+    app.get("/bookings/manage-bookings",verifyFirebaseToken, async (req, res) => {
+
+      const result = await bookingCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.get('/bookings/decorator-assigned',verifyFirebaseToken, async(req, res)=>{
       const {email} = req.query;
       const query = {}
       if(email){
         query.decoratorEmail= email;
+      }
+      if(email !== req.decoded_email){
+        res.status(403).send({message: 'Forbidden access'})
+        return
       }
       const result = await bookingCollection.find(query).toArray()
       res.send(result)
