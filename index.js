@@ -76,6 +76,18 @@ async function run() {
     const servicesCollection = db.collection("Services");
     const bookingCollection = db.collection("Bookings");
     const paymentsCollection = db.collection("Payments");
+    const trackingsCollection = db.collection("Trackings");
+
+
+    // trackings api 
+    const logTrackings = async (trackingId, status) =>{
+      const log = {
+        trackingId, 
+        status, 
+        createdAt: new Date().toDateString()
+      }
+      const result = await trackingsCollection.insertOne(log)
+    }
 
     // user related api
     app.post("/users", async (req, res) => {
@@ -140,6 +152,12 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+    app.get('/manage-services',verifyFirebaseToken, async(req, res)=>{
+      const {email} = req.query;
+      const cursor = servicesCollection.find({creatorEmail: email});
+      const result = await cursor.toArray();
+      res.send(result);
+    })
 
     app.get("/hero-services", async (req, res) => {
       const projectFields = {
@@ -168,14 +186,16 @@ async function run() {
     //***********  Booking related APIs here *****************
     app.post("/bookings", async (req, res) => {
       const bookingInfo = req.body;
-      bookingInfo.trackingId = generateTrackingId();
+      const trackingId = generateTrackingId();
+      bookingInfo.trackingId = trackingId
       const result = await bookingCollection.insertOne(bookingInfo);
+      logTrackings(trackingId, 'Created')
       res.send(result);
     });
 
     app.get("/bookings",verifyFirebaseToken, async (req, res) => {
       console.log('api theke',req.decoded_email)
-      const { email } = req.query;
+      const { email, limit= 0, skip = 0 } = req.query;
       const query = {};
       if (email) {
         query.customerEmail = email;
@@ -184,9 +204,16 @@ async function run() {
         res.status(403).send({message: 'Forbidden access'})
         return
       }
-      const result = await bookingCollection.find(query).toArray();
-      res.send(result);
+      const bookings = await bookingCollection.find(query).skip(Number(skip)).limit(Number(limit)).toArray();
+      const count = await bookingCollection.countDocuments()
+      res.send({bookings, count});
     });
+    // for pagination 
+    app.get('/bookings/count', async(req, res)=>{
+      const {email} = req.query;
+      const result = await bookingCollection.find({customerEmail: email}).toArray()
+      res.send(result)
+    })
 
     app.get("/bookings/manage-bookings",verifyFirebaseToken, async (req, res) => {
 
@@ -222,12 +249,13 @@ async function run() {
         }
       }
       const result = await bookingCollection.updateOne(query, updateDoc)
+      logTrackings(decorator.trackingId, 'Assigned')
       res.send(result)
     })
 
     app.patch('/bookings/:id/Update-service-status', async(req, res)=>{
       const id = req.params.id;
-      const {status} = req.body;
+      const {status, trackingId} = req.body;
       const query = {_id: new ObjectId(id)}
 
       const updateDoc = {
@@ -237,6 +265,7 @@ async function run() {
       }
 
       const result = bookingCollection.updateOne(query, updateDoc)
+      logTrackings(trackingId, status)
       res.send(result)
 
 
@@ -321,6 +350,7 @@ async function run() {
           },
         };
         const bookingUpdateResult = await bookingCollection.updateOne(query, updateDoc);
+        logTrackings(session.metadata.trackingId, 'Pending')
         res.send({paymentResult, bookingUpdateResult})
       }
     });
