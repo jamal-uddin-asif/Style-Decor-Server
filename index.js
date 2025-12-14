@@ -221,16 +221,21 @@ async function run() {
 
     app.get("/bookings",verifyFirebaseToken, async (req, res) => {
       
-      const { email, limit= 0, skip = 0 } = req.query;
+      const { email, limit= 0, skip = 0, sort, status } = req.query;
       const query = {};
       if (email) {
         query.customerEmail = email;
+      }
+      if(status){
+        query.serviceStatus = status
       }
       if(email !== req.decoded_email){
         res.status(403).send({message: 'Forbidden access'})
         return
       }
-      const bookings = await bookingCollection.find(query).skip(Number(skip)).limit(Number(limit)).toArray();
+      const sortFormat = sort === 'Newest-first' ? -1 : 1;
+
+      const bookings = await bookingCollection.find(query).sort({bookingDate: sortFormat}).skip(Number(skip)).limit(Number(limit)).toArray();
       const count = await bookingCollection.countDocuments()
       res.send({bookings, count});
     });
@@ -303,6 +308,15 @@ async function run() {
       const result = await bookingCollection.deleteOne(query);
       res.send(result);
     });
+
+    // trackings related APIs 
+    app.get('/trackings/:trackingId', async(req, res)=>{
+      const {trackingId} = req.params 
+      const query = {trackingId}
+      const result = await trackingsCollection.find(query).toArray()
+      res.send(result)
+
+    })
 
     // Payment Related APIs
     app.post("/create-checkout-session", async (req, res) => {
