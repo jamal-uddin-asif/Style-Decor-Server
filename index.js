@@ -170,7 +170,7 @@ async function run() {
       const cursor = servicesCollection
         .find()
         .project(projectFields)
-        .skip(7)
+        .skip(0)
         .limit(4);
       const result = await cursor.toArray();
       res.send(result);
@@ -183,6 +183,32 @@ async function run() {
       res.send(result);
     });
 
+    app.patch('/service/:id', async(req, res)=>{
+      const id = req.params.id;
+      const service = req.body;
+      const query = {_id: new ObjectId(id)}
+      console.log(service)
+      const updateDoc = {
+        $set: {
+          category: service.category,
+          cost: service.cost,
+          description: service.description,
+          location: service.location,
+          rating: service.rating,
+          serviceName: service.serviceName,
+          shortDescription: service.shortDescription
+        }
+      }
+      const updated = await servicesCollection.updateOne(query, updateDoc)
+      res.send(updated)
+    })
+
+    app.delete('/services/:id', async(req, res)=>{
+      const id = req.params.id
+      const deleted = await servicesCollection.deleteOne({_id: new ObjectId(id)}) 
+      res.send(deleted)
+    })
+
     //***********  Booking related APIs here *****************
     app.post("/bookings", async (req, res) => {
       const bookingInfo = req.body;
@@ -194,7 +220,7 @@ async function run() {
     });
 
     app.get("/bookings",verifyFirebaseToken, async (req, res) => {
-      console.log('api theke',req.decoded_email)
+      
       const { email, limit= 0, skip = 0 } = req.query;
       const query = {};
       if (email) {
