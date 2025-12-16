@@ -219,6 +219,7 @@ async function run() {
       res.send(result);
     });
 
+
     app.get("/bookings",verifyFirebaseToken, async (req, res) => {
       
       const { email, limit= 0, skip = 0, sort, status } = req.query;
@@ -294,12 +295,29 @@ async function run() {
           serviceStatus: status,
         }
       }
-
       const result = bookingCollection.updateOne(query, updateDoc)
       logTrackings(trackingId, status)
       res.send(result)
 
+    })
 
+        
+    app.patch('/bookings/:id/myBooking',verifyFirebaseToken, async(req, res)=>{
+      const {id} = req.params;
+      const query = {_id: new ObjectId(id)}
+      const booking = req.body;
+      const updatedDoc = {
+        $set: {
+          customerEmail: booking.customerEmail,
+          customerName: booking.customerName,
+          bookingDate: booking.bookingDate,
+          customerLocation: booking.customerLocation,
+          feet: booking.feet,
+        }
+      }
+
+      const result = await bookingCollection.updateOne(query, updatedDoc)
+      res.send(result)
     })
 
     app.delete("/booking/:id", async (req, res) => {
@@ -394,6 +412,28 @@ async function run() {
         res.send({paymentResult, bookingUpdateResult})
       }
     });
+
+    // revenue related APIs 
+    app.get('/revenue',verifyFirebaseToken, async(req, res)=>{
+        const query = {paymentStatus: 'Paid'}
+        const result = await bookingCollection.find(query).toArray()
+        res.send(result)
+    })
+
+    // service demand api 
+    app.get('/service-demand', verifyFirebaseToken, async(req, res)=>{
+      const pipeline = [
+        {
+          $group: {
+            _id: '$category',
+            count: {$sum: 1}
+          }
+        },
+      ]
+      const result = await bookingCollection.aggregate(pipeline).toArray()
+      res.send(result)
+
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log(
