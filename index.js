@@ -11,7 +11,11 @@ app.use(cors());
 app.use(express.json());
 
 const admin = require("firebase-admin");
-const serviceAccount = require("./firebase-adminsdk.json");
+
+// const serviceAccount = require("./firebase-adminsdk.json");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
@@ -133,7 +137,7 @@ async function run() {
     });
 
     // services related APIs
-    app.post("/services", async (req, res) => {
+    app.post("/services", verifyFirebaseToken, async (req, res) => {
       const service = req.body;
       const result = await servicesCollection.insertOne(service);
       res.send(result);
@@ -170,7 +174,7 @@ async function run() {
       const cursor = servicesCollection
         .find()
         .project(projectFields)
-        .skip(0)
+        .skip(1)
         .limit(4);
       const result = await cursor.toArray();
       res.send(result);
@@ -221,7 +225,6 @@ async function run() {
 
 
     app.get("/bookings",verifyFirebaseToken, async (req, res) => {
-      
       const { email, limit= 0, skip = 0, sort, status } = req.query;
       const query = {};
       if (email) {
@@ -240,21 +243,34 @@ async function run() {
       const count = await bookingCollection.countDocuments()
       res.send({bookings, count});
     });
-    // for pagination 
+    // for my booking pagination 
     app.get('/bookings/count', async(req, res)=>{
       const {email} = req.query;
       const result = await bookingCollection.find({customerEmail: email}).toArray()
       res.send(result)
     })
+    // for payment history pagination 
+    app.get('/bookings/payment-history/count', async(req, res)=>{
+      const {email} = req.query;
+      const query = {
+        customerEmail: email,
+        paymentStatus: 'Paid'
+      }
+      const result = await bookingCollection.find(query).toArray()
+      res.send(result)
+    })
 
     app.get("/bookings/manage-bookings",verifyFirebaseToken, async (req, res) => {
+      const query = {
+        serviceStatus: {$nin: ['Assigned', 'Planning Phase', 'Materials Prepared', 'On the Way to Venue', 'Setup in Progress', 'Completed']}
+      }
 
-      const result = await bookingCollection.find().toArray();
+      const result = await bookingCollection.find(query).toArray();
       res.send(result);
     });
 
     app.get('/bookings/decorator-assigned',verifyFirebaseToken, async(req, res)=>{
-      const {email} = req.query;
+      const {email, TodaysSchedule} = req.query;
       const query = {}
       if(email){
         query.decoratorEmail= email;
@@ -263,7 +279,40 @@ async function run() {
         res.status(403).send({message: 'Forbidden access'})
         return
       }
+      if(TodaysSchedule){
+        query.bookingDate = TodaysSchedule
+      }
       const result = await bookingCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    app.get('/bookings/:email/earning-summary',verifyFirebaseToken, async(req, res)=>{
+      const {email} = req.params;
+      const query = {
+        decoratorEmail: email,
+        serviceStatus: 'Completed'
+      }
+
+      const result = await bookingCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    app.get('/bookings/:email/payment-history', verifyFirebaseToken, async(req, res)=>{
+      const {limit = 0, skip = 0} = req.query;
+      const {email} = req.params;
+      const query = {
+        customerEmail: email,
+        paymentStatus: 'Paid'
+      }
+      const result = await bookingCollection.find(query).limit(Number(limit)).skip(Number(skip)).toArray()
+      res.send(result)
+    })
+
+    app.get('/booking/:id/payment-receipt', verifyFirebaseToken, async(req, res)=>{
+       
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await bookingCollection.findOne(query)
       res.send(result)
     })
 
@@ -432,10 +481,18 @@ async function run() {
       ]
       const result = await bookingCollection.aggregate(pipeline).toArray()
       res.send(result)
+    })
+
+    // get role 
+    app.get('/users/:email/role', async(req, res)=>{
+      const {email} = req.params;
+      const query = {email}
+      const user = await userCollection.findOne(query)
+      res.send({role: user?.role || 'User'})
 
     })
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
