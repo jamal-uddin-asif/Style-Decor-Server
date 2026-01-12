@@ -109,7 +109,6 @@ async function run() {
 
     app.get("/users", async (req, res) => {
       const { email, role } = req.query;
-      console.log("AllDecorator --->", role);
       const query = {};
       if (email) {
         query.email = email;
@@ -144,7 +143,7 @@ async function run() {
     });
 
     app.get("/services", async (req, res) => {
-      const { search, category } = req.query;
+      const { search, category, limit = 0, skip = 0 } = req.query;
       const query = {};
       if (search) {
         query.serviceName = { $regex: search, $options: "i" };
@@ -152,9 +151,10 @@ async function run() {
       if (category) {
         query.category = category;
       }
-      const cursor = servicesCollection.find(query);
+      const cursor = servicesCollection.find(query).skip(Number(skip)).limit(Number(limit));
       const result = await cursor.toArray();
-      res.send(result);
+      const count = await servicesCollection.countDocuments()
+      res.send({result, total: count});
     });
     app.get('/manage-services',verifyFirebaseToken, async(req, res)=>{
       const {email} = req.query;
